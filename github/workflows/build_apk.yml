@@ -1,0 +1,45 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      # Generate the complete Android/Gradle wrapper scaffold using the installed SDK,
+      # while preserving this project's requested manifest and styles.
+      - name: Generate Android platform scaffold
+        shell: bash
+        run: |
+          cp android/app/src/main/AndroidManifest.xml /tmp/madar-manifest.xml
+          cp android/app/src/main/res/values/styles.xml /tmp/madar-styles.xml
+          flutter create --platforms=android --org ir.madar --project-name madar --overwrite /tmp/madar-scaffold
+          rm -rf android
+          cp -R /tmp/madar-scaffold/android ./android
+          cp /tmp/madar-manifest.xml android/app/src/main/AndroidManifest.xml
+          cp /tmp/madar-styles.xml android/app/src/main/res/values/styles.xml
+      - name: Resolve packages
+        run: flutter pub get
+      - name: Build release APK
+        run: flutter build apk --release
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: madar-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 14
